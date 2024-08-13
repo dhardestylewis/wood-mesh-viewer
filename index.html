@@ -70,8 +70,13 @@
                                     const loader = new THREE.BufferGeometryLoader();
                                     const parsedGeometry = loader.parse(geometry.data);
 
-                                    if (!parsedGeometry.index && !parsedGeometry.attributes.position) {
-                                        throw new Error('Geometry is missing essential data like index or position attributes.');
+                                    // Check if index is present and valid
+                                    if (!parsedGeometry.index || !parsedGeometry.index.array.length) {
+                                        console.warn('Geometry is missing index data or index array is empty. Rendering without index.');
+                                    }
+
+                                    if (!parsedGeometry.attributes.position) {
+                                        throw new Error('Geometry is missing essential data like position attributes.');
                                     }
 
                                     const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
