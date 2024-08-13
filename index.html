@@ -66,11 +66,20 @@
 
                         if (allCompatible) {
                             geometries.forEach((geometry) => {
-                                const loader = new THREE.BufferGeometryLoader();
-                                const parsedGeometry = loader.parse(geometry.data);
-                                const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
-                                const mesh = new THREE.Mesh(parsedGeometry, material);
-                                scene.add(mesh);
+                                try {
+                                    const loader = new THREE.BufferGeometryLoader();
+                                    const parsedGeometry = loader.parse(geometry.data);
+
+                                    if (!parsedGeometry.index && !parsedGeometry.attributes.position) {
+                                        throw new Error('Geometry is missing essential data like index or position attributes.');
+                                    }
+
+                                    const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
+                                    const mesh = new THREE.Mesh(parsedGeometry, material);
+                                    scene.add(mesh);
+                                } catch (error) {
+                                    console.error('Error parsing geometry:', error);
+                                }
                             });
 
                             // Center the camera on the scene
