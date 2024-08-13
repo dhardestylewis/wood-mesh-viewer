@@ -52,7 +52,7 @@
             directionalLight.position.set(1, 1, 1);
             scene.add(directionalLight);
 
-            fetch('chair.json')
+            fetch('flattened_chair.json')
                 .then(response => response.json())
                 .then(data => {
                     if (checkJSONCompatibility(data)) {
