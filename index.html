@@ -16,6 +16,28 @@
     <script>
         let scene, camera, renderer, controls;
 
+        function checkGeometryCompatibility(geometry) {
+            const essentialFields = ['metadata', 'type', 'data'];
+            const missingFields = essentialFields.filter(field => !geometry.hasOwnProperty(field));
+
+            if (missingFields.length > 0) {
+                console.error(`Geometry is missing the following essential fields: ${missingFields.join(', ')}`);
+                return false;
+            }
+
+            if (geometry.metadata.type !== 'BufferGeometry') {
+                console.error('Geometry is not of type BufferGeometry. Type found:', geometry.metadata.type);
+                return false;
+            }
+
+            if (!geometry.data || !geometry.data.attributes) {
+                console.error('Geometry data is missing attributes for BufferGeometry.');
+                return false;
+            }
+
+            return true;
+        }
+
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -33,22 +55,35 @@
                 .then(response => response.json())
                 .then(geometries => {
                     if (Array.isArray(geometries) && geometries.length > 0) {
-                        geometries.forEach((data) => {
-                            const loader = new THREE.BufferGeometryLoader();
-                            const geometry = loader.parse(data.data);
-                            const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
-                            const mesh = new THREE.Mesh(geometry, material);
-                            scene.add(mesh);
+                        let allCompatible = true;
+
+                        geometries.forEach((geometry, index) => {
+                            if (!checkGeometryCompatibility(geometry)) {
+                                console.error(`Incompatible geometry at index ${index}.`);
+                                allCompatible = false;
+                            }
                         });
 
-                        // Center the camera on the scene
-                        const box = new THREE.Box3().setFromObject(scene);
-                        const center = box.getCenter(new THREE.Vector3());
-                        const size = box.getSize(new THREE.Vector3());
-                        const maxDim = Math.max(size.x, size.y, size.z);
-                        camera.position.copy(center);
-                        camera.position.z += maxDim * 2;
-                        camera.lookAt(center);
+                        if (allCompatible) {
+                            geometries.forEach((geometry) => {
+                                const loader = new THREE.BufferGeometryLoader();
+                                const parsedGeometry = loader.parse(geometry.data);
+                                const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
+                                const mesh = new THREE.Mesh(parsedGeometry, material);
+                                scene.add(mesh);
+                            });
+
+                            // Center the camera on the scene
+                            const box = new THREE.Box3().setFromObject(scene);
+                            const center = box.getCenter(new THREE.Vector3());
+                            const size = box.getSize(new THREE.Vector3());
+                            const maxDim = Math.max(size.x, size.y, size.z);
+                            camera.position.copy(center);
+                            camera.position.z += maxDim * 2;
+                            camera.lookAt(center);
+                        } else {
+                            console.error('One or more geometries are incompatible.');
+                        }
                     } else {
                         console.error('No compatible geometries found in JSON file.');
                     }
