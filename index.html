@@ -16,98 +16,67 @@
     <script>
         let scene, camera, renderer, controls;
 
-        function checkGeometryCompatibility(geometry) {
-            const essentialFields = ['metadata', 'type', 'data'];
-            const missingFields = essentialFields.filter(field => !geometry.hasOwnProperty(field));
-
-            if (missingFields.length > 0) {
-                console.error(`Geometry is missing the following essential fields: ${missingFields.join(', ')}`);
-                return false;
-            }
-
-            if (geometry.metadata.type !== 'BufferGeometry') {
-                console.error('Geometry is not of type BufferGeometry. Type found:', geometry.metadata.type);
-                return false;
-            }
-
-            if (!geometry.data || !geometry.data.attributes) {
-                console.error('Geometry data is missing attributes for BufferGeometry.');
-                return false;
-            }
-
-            return true;
-        }
-
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Adjust camera near and far planes to reduce z-fighting
+            camera.near = 0.1;
+            camera.far = 1000;
+            camera.updateProjectionMatrix();
+
             renderer = new THREE.WebGLRenderer();
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
+            // Add lights
             const ambientLight = new THREE.AmbientLight(0x404040);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
             directionalLight.position.set(1, 1, 1);
             scene.add(directionalLight);
 
+            // Fetch and load the chair geometry
             fetch('chair_threejs.json')
                 .then(response => response.json())
                 .then(geometries => {
                     if (Array.isArray(geometries) && geometries.length > 0) {
-                        let allCompatible = true;
-            
-                        geometries.forEach((geometry, index) => {
-                            if (!checkGeometryCompatibility(geometry)) {
-                                console.error(`Incompatible geometry at index ${index}.`);
-                                allCompatible = false;
+                        geometries.forEach((geometryData, index) => {
+                            try {
+                                const loader = new THREE.BufferGeometryLoader();
+                                console.log(`Checking index for geometry at index ${index}:`, geometryData.data.index);
+
+                                if (!geometryData.data.index || !geometryData.data.index.array.length) {
+                                    console.warn(`Geometry at index ${index} is missing or has an empty index array. Rendering without index.`);
+                                    delete geometryData.data.index;
+                                }
+
+                                const parsedGeometry = loader.parse(geometryData);
+
+                                // Recalculate normals to ensure proper lighting
+                                parsedGeometry.computeVertexNormals();
+
+                                const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
+                                const mesh = new THREE.Mesh(parsedGeometry, material);
+                                scene.add(mesh);
+                            } catch (error) {
+                                console.error('Error parsing geometry:', error);
                             }
                         });
-            
-                        if (allCompatible) {
-                            geometries.forEach((geometryData, index) => {
-                                try {
-                                    const loader = new THREE.BufferGeometryLoader();
-            
-                                    // Ensure index is present and correctly structured
-                                    if (!geometryData.data.index || !geometryData.data.index.array.length) {
-                                        console.warn(`Geometry at index ${index} is missing or has an empty index array. Rendering without index.`);
-                                        delete geometryData.data.index;  // Remove index if empty
-                                    }
-            
-                                    const parsedGeometry = loader.parse(geometryData);
-            
-                                    // Check if essential attributes are present
-                                    if (!parsedGeometry.attributes.position) {
-                                        throw new Error('Geometry is missing essential data like position attributes.');
-                                    }
-            
-                                    // Create a material and mesh
-                                    const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
-                                    const mesh = new THREE.Mesh(parsedGeometry, material);
-                                    scene.add(mesh);
-                                } catch (error) {
-                                    console.error('Error parsing geometry:', error);
-                                }
-                            });
-            
-                            // Center the camera on the scene
-                            const box = new THREE.Box3().setFromObject(scene);
-                            const center = box.getCenter(new THREE.Vector3());
-                            const size = box.getSize(new THREE.Vector3());
-                            const maxDim = Math.max(size.x, size.y, size.z);
-                            camera.position.copy(center);
-                            camera.position.z += maxDim * 2;
-                            camera.lookAt(center);
-                        } else {
-                            console.error('One or more geometries are incompatible.');
-                        }
+
+                        // Center the camera on the scene
+                        const box = new THREE.Box3().setFromObject(scene);
+                        const center = box.getCenter(new THREE.Vector3());
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        camera.position.copy(center);
+                        camera.position.z += maxDim * 2;
+                        camera.lookAt(center);
                     } else {
                         console.error('No compatible geometries found in JSON file.');
                     }
                 })
                 .catch(error => console.error('Error loading or parsing JSON:', error));
-
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
