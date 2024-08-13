@@ -51,36 +51,38 @@
             directionalLight.position.set(1, 1, 1);
             scene.add(directionalLight);
 
-            fetch('flattened_chair.json')
+            fetch('chair_threejs.json')
                 .then(response => response.json())
                 .then(geometries => {
                     if (Array.isArray(geometries) && geometries.length > 0) {
                         let allCompatible = true;
-
+            
                         geometries.forEach((geometry, index) => {
                             if (!checkGeometryCompatibility(geometry)) {
                                 console.error(`Incompatible geometry at index ${index}.`);
                                 allCompatible = false;
                             }
                         });
-
+            
                         if (allCompatible) {
-                            geometries.forEach((geometry, index) => {
+                            geometries.forEach((geometryData, index) => {
                                 try {
                                     const loader = new THREE.BufferGeometryLoader();
-
-                                    // Explicitly check if index is present
-                                    if (!geometry.data.index) {
-                                        console.warn(`Geometry at index ${index} is missing index data. Attempting to render without index.`);
-                                        geometry.data.index = { type: 'Uint16Array', array: [] }; // Fallback to an empty index if necessary
+            
+                                    // Ensure index is present and correctly structured
+                                    if (!geometryData.data.index || !geometryData.data.index.array.length) {
+                                        console.warn(`Geometry at index ${index} is missing or has an empty index array. Rendering without index.`);
+                                        delete geometryData.data.index;  // Remove index if empty
                                     }
-
-                                    const parsedGeometry = loader.parse(geometry.data);
-
+            
+                                    const parsedGeometry = loader.parse(geometryData);
+            
+                                    // Check if essential attributes are present
                                     if (!parsedGeometry.attributes.position) {
                                         throw new Error('Geometry is missing essential data like position attributes.');
                                     }
-
+            
+                                    // Create a material and mesh
                                     const material = new THREE.MeshPhongMaterial({ color: 0x808080 });
                                     const mesh = new THREE.Mesh(parsedGeometry, material);
                                     scene.add(mesh);
@@ -88,7 +90,7 @@
                                     console.error('Error parsing geometry:', error);
                                 }
                             });
-
+            
                             // Center the camera on the scene
                             const box = new THREE.Box3().setFromObject(scene);
                             const center = box.getCenter(new THREE.Vector3());
@@ -105,6 +107,7 @@
                     }
                 })
                 .catch(error => console.error('Error loading or parsing JSON:', error));
+
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
