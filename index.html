@@ -12,8 +12,32 @@
 <body>
     <div id="info">Wood Mesh Viewer</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
         let scene, camera, renderer, mesh, controls;
+
+        function checkJSONCompatibility(jsonData) {
+            const essentialFields = ['metadata', 'type', 'data'];
+            const missingFields = essentialFields.filter(field => !jsonData.hasOwnProperty(field));
+
+            if (missingFields.length > 0) {
+                console.error(`JSON is missing the following essential fields: ${missingFields.join(', ')}`);
+                return false;
+            }
+
+            if (jsonData.metadata.type !== 'BufferGeometry') {
+                console.error('JSON is not of type BufferGeometry. Type found:', jsonData.metadata.type);
+                return false;
+            }
+
+            if (!jsonData.data || !jsonData.data.attributes) {
+                console.error('JSON data is missing attributes for BufferGeometry.');
+                return false;
+            }
+
+            console.log('JSON is compatible with Three.js BufferGeometry.');
+            return true;
+        }
 
         function init() {
             scene = new THREE.Scene();
@@ -22,33 +46,36 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Lights
             const ambientLight = new THREE.AmbientLight(0x404040);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
             directionalLight.position.set(1, 1, 1);
             scene.add(directionalLight);
 
-            // Load the JSON file
-            const loader = new THREE.BufferGeometryLoader();
-            loader.load('chair.json', function(geometries) {
-                geometries.forEach(function(geometry) {
-                    const material = new THREE.MeshPhongMaterial({color: 0x808080});
-                    mesh = new THREE.Mesh(geometry, material);
-                    scene.add(mesh);
-                });
+            fetch('chair.json')
+                .then(response => response.json())
+                .then(data => {
+                    if (checkJSONCompatibility(data)) {
+                        const loader = new THREE.BufferGeometryLoader();
+                        loader.parse(data, function (geometry) {
+                            const material = new THREE.MeshPhongMaterial({color: 0x808080});
+                            mesh = new THREE.Mesh(geometry, material);
+                            scene.add(mesh);
 
-                // Center the camera on the mesh
-                const box = new THREE.Box3().setFromObject(scene);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
-                camera.position.copy(center);
-                camera.position.z += maxDim * 2;
-                camera.lookAt(center);
-            });
+                            const box = new THREE.Box3().setFromObject(scene);
+                            const center = box.getCenter(new THREE.Vector3());
+                            const size = box.getSize(new THREE.Vector3());
+                            const maxDim = Math.max(size.x, size.y, size.z);
+                            camera.position.copy(center);
+                            camera.position.z += maxDim * 2;
+                            camera.lookAt(center);
+                        });
+                    } else {
+                        console.error('Incompatible JSON file.');
+                    }
+                })
+                .catch(error => console.error('Error loading or parsing JSON:', error));
 
-            // OrbitControls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.25;
@@ -65,13 +92,11 @@
 
         init();
 
-        // Handle window resizing
         window.addEventListener('resize', function() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }, false);
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.min.js"></script>
 </body>
 </html>
